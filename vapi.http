@@ -1,0 +1,13 @@
+@VAPI_API_KEY=bbbff780-6630-4ff4-89b6-7fb71d31a9a5
+@VAPI_ASSISTANT_ID=91d05d25-af73-468a-9b62-3e2cf04246ca
+@WEBHOOK_URL=https://digihire.ai/vapi/webhook
+
+
+### Update Vapi Assistant – Configure Webhook
+PATCH https://api.vapi.ai/assistant/{{VAPI_ASSISTANT_ID}}
+Authorization: Bearer {{VAPI_API_KEY}}
+Content-Type: application/json
+
+{
+  "serverUrl": "{{WEBHOOK_URL}}"
+}

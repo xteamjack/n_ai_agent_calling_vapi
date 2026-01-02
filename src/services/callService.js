@@ -1,5 +1,5 @@
 const axios = require("axios");
-const { getCollection } = require("../db");
+const { getCollection } = require("../libs/db");
 
 const COLLECTION = "survey_calls";
 
