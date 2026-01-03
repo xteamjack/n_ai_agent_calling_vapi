@@ -5,7 +5,10 @@ const { getCollection } = require("./libs/db");
 const { startCall } = require("./services/callService");
 
 const app = express();
-app.use(express.json());
+// app.use(express.json());
+// 🔴 MUST be before routes
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true }));
 
 const COLLECTION = "survey_calls";
 
@@ -21,77 +24,100 @@ app.get("/vapi/info", async (req, res) => {
   res.send("VAPI endpoint v0.2.23");
 });
 
-app.post("/vapi/webhook", async (req, res) => {
-  const event = req.body;
-  const collection = await getCollection(COLLECTION);
+// app.post("/vapi/webhook", async (req, res) => {
+//   try {
+//     const event = req.body.message;
 
-  console.log(event);
+//     if (!event?.type) {
+//       console.error("Unknown webhook payload shape", req.body);
+//       return res.sendStatus(400);
+//     }
 
-  try {
-    switch (event.type) {
-      case "call.started":
-        console.log("call started");
-        await collection.updateOne(
-          { callId: event.callId },
-          {
-            $set: {
-              status: "in-progress",
-              startedAt: new Date(),
-            },
-          }
-        );
-        break;
+//     const callId = event.call?.id;
+//     const collection = await getCollection(COLLECTION);
 
-      case "tool.called":
-        console.log("tool called");
-        if (event.tool?.name === "saveSurveyAnswer") {
-          await collection.updateOne(
-            { callId: event.callId },
-            {
-              $set: {
-                [`answers.${event.tool.arguments.questionId}`]:
-                  event.tool.arguments.answer,
-              },
-            }
-          );
-        }
-        break;
+//     console.log("VAPI EVENT:", event.type, "CALL:", callId);
 
-      case "transcript.updated":
-        console.log("transcript update");
-        await saveTranscript(callId, event.transcript);
-        break;
+//     switch (event.type) {
+//       case "status-update":
+//         if (event.status === "in-progress") {
+//           await collection.updateOne(
+//             { callId },
+//             {
+//               $set: {
+//                 status: "in-progress",
+//                 startedAt: new Date(event.timestamp),
+//               },
+//             },
+//             { upsert: true }
+//           );
+//         }
+//         break;
 
-      case "call.ended":
-        console.log("call emd");
-        await collection.updateOne(
-          { callId: event.callId },
-          {
-            $set: {
-              status: event.reason,
-              endedAt: new Date(),
-              transcript: event.transcript,
-              recordingUrl: event.recordingUrl,
-            },
-          }
-        );
-        break;
-    }
+//       case "assistant.started":
+//         await collection.updateOne(
+//           { callId },
+//           {
+//             $set: {
+//               assistantId: event.assistant?.id,
+//               assistantName: event.assistant?.name,
+//             },
+//           },
+//           { upsert: true }
+//         );
+//         break;
 
-    res.sendStatus(200);
-  } catch (err) {
-    console.error("Webhook error:", err);
-    res.sendStatus(500);
-  }
-});
+//       case "tool.called":
+//         if (event.tool?.name === "saveSurveyAnswer") {
+//           await collection.updateOne(
+//             { callId },
+//             {
+//               $set: {
+//                 [`answers.${event.tool.arguments.questionId}`]:
+//                   event.tool.arguments.answer,
+//               },
+//             }
+//           );
+//         }
+//         break;
 
-async function saveTranscript(callId, transcript) {
-  const file = path.join(process.env.TRANSCRIPTS_DIR, `${callId}.txt`);
+//       case "speech-update":
+//         // optional: track speech lifecycle
+//         break;
 
-  const text = transcript.map((t) => `[${t.speaker}] ${t.text}`).join("\n");
+//       case "call.ended":
+//         await collection.updateOne(
+//           { callId },
+//           {
+//             $set: {
+//               status: "ended",
+//               endedAt: new Date(event.timestamp),
+//               transcript: event.artifact?.messages,
+//             },
+//           }
+//         );
+//         break;
 
-  await fs.outputFile(file, text);
-}
+//       default:
+//         console.log("Unhandled VAPI event:", event.type);
+//     }
+
+//     res.sendStatus(200);
+//   } catch (err) {
+//     console.error("Webhook error:", err);
+//     res.sendStatus(500);
+//   }
+// });
+
+// async function saveTranscript(callId, transcript) {
+//   const file = path.join(process.env.TRANSCRIPTS_DIR, `${callId}.txt`);
+
+//   const text = transcript.map((t) => `[${t.speaker}] ${t.text}`).join("\n");
+
+//   await fs.outputFile(file, text);
+// }
+
+app.use(require("./routes/vapiWebHook"));
 
 app.post("/vapi/test-call", async (req, res) => {
   const { phone } = req.body;
